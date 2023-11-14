@@ -52,6 +52,7 @@ BEGIN_MESSAGE_MAP(Cimgproc20181369View, CScrollView)
 	ON_COMMAND(ID_GEOMETRY_ZOOMOUT_SUB_SAMPLING, &Cimgproc20181369View::OnGeometryZoomoutSubSampling)
 	ON_COMMAND(ID_GEOMETRY_ZOOMOUT_MEAN_SUB_SAMPLING, &Cimgproc20181369View::OnGeometryZoomoutMeanSubSampling)
 	ON_COMMAND(ID_GEOMETRY_AVG_SAMPLING, &Cimgproc20181369View::OnGeometryAvgSampling)
+	ON_COMMAND(ID_GEOMETRY_ROTATION, &Cimgproc20181369View::OnGeometryRotation)
 END_MESSAGE_MAP()
 
 // Cimgproc20181369View 생성/소멸
@@ -1427,5 +1428,81 @@ void Cimgproc20181369View::OnGeometryAvgSampling()
 			}
 		}
 
+	Invalidate();
+}
+
+
+#define PI 3.14159265358979
+void Cimgproc20181369View::OnGeometryRotation()
+{
+	Cimgproc20181369Doc* pDoc = GetDocument();
+
+	int x, y, i, j;
+	int angle = 30;    //단위는 degree 각도 설정
+	float radian;
+	int Cx, Cy, Oy;
+	int x_source, y_source, xdiff, ydiff;
+
+	if (pDoc->gResultImg != NULL)
+	{
+		for (i = 0; i < pDoc->gImageHeight; i++)
+			free(pDoc->gResultImg[i]); //이거 먼저 없애주고
+		free(pDoc->gResultImg);  // 다음에 이걸 제거
+	}
+
+	radian = 2 * PI / 360 * angle;//        fabs = 절대값으로 만드는 함수
+	pDoc->gImageWidth = pDoc->imageHeight * fabs(cos(PI / 2 - radian)) + pDoc->imageWidth * cos(radian);
+	pDoc->gImageHeight = pDoc->imageHeight * fabs(cos(radian)) + pDoc->imageWidth * fabs(cos(PI / 2 - radian));
+
+	//메모리 할당
+	pDoc->gResultImg = (unsigned char**)malloc(pDoc->gImageHeight * sizeof(unsigned char*));
+	for (i = 0; i < pDoc->gImageHeight; i++)
+	{
+		pDoc->gResultImg[i] = (unsigned char*)malloc(pDoc->gImageWidth * pDoc->depth);
+	}
+
+	//중심점
+	Cx = pDoc->imageWidth / 2;
+	Cy = pDoc->imageHeight / 2;
+
+    //y의 마지막 좌표
+	Oy = pDoc->imageHeight - 1;
+	xdiff = (pDoc->gImageWidth - pDoc->imageWidth) / 2;
+	ydiff = (pDoc->gImageHeight - pDoc->imageHeight) / 2;
+
+	for (y = -ydiff; y < pDoc->gImageHeight - ydiff; y++)
+		for (x = -xdiff; x < pDoc->gImageWidth - xdiff; x++)
+		{
+			x_source = (Oy - y - Cy) * sin(radian) + (x - Cx) * cos(radian) + Cx;
+			y_source = Oy - ((Oy - y - Cy) * cos(radian) - (x - Cx) * sin(radian) + Cy);
+
+			if (pDoc->depth == 1)
+			{
+				if (x_source < 0 || x_source > pDoc->imageWidth - 1 ||
+					y_source < 0 || y_source > pDoc->imageHeight - 1)
+					pDoc->gResultImg[y + ydiff][x + xdiff] = 255; //빈영역 색상
+				else
+				{
+					pDoc->gResultImg[y + ydiff][x + xdiff] = pDoc->InputImg[y_source][x_source];
+				}
+			}
+			else
+			{
+				if (x_source < 0 || x_source > pDoc->imageWidth - 1 ||
+					y_source < 0 || y_source > pDoc->imageHeight - 1)
+				{
+					pDoc->gResultImg[y + ydiff][3 * (x + xdiff) + 0] = 255;
+					pDoc->gResultImg[y + ydiff][3 * (x + xdiff) + 1] = 255;
+					pDoc->gResultImg[y + ydiff][3 * (x + xdiff) + 2] = 255;
+				}	
+				else
+				{
+					pDoc->gResultImg[y + ydiff][3 * (x + xdiff) + 0] = pDoc->InputImg[y_source][3 * x_source + 0];
+					pDoc->gResultImg[y + ydiff][3 * (x + xdiff) + 1] = pDoc->InputImg[y_source][3 * x_source + 1];
+					pDoc->gResultImg[y + ydiff][3 * (x + xdiff) + 2] = pDoc->InputImg[y_source][3 * x_source + 2];
+				}
+			}
+			
+		}
 	Invalidate();
 }
